@@ -96,7 +96,7 @@ approved.
 Maintainers
 ~~~~~~~~~~~
 
-The Fabric project is lead by the project's top level `maintainers <https://github.com/hyperledger/fabric/blob/master/MAINTAINERS.md>`__.
+The Fabric project is led by the project's top level `maintainers <https://github.com/hyperledger/fabric/blob/master/MAINTAINERS.md>`__.
 The maintainers are responsible for reviewing and merging all patches submitted
 for review, and they guide the overall technical direction of the project within
 the guidelines established by the Hyperledger Technical Steering Committee (TSC).

@@ -13,6 +13,7 @@ import (
 
 	ab "github.com/hyperledger/fabric-protos-go/orderer"
 	"github.com/hyperledger/fabric-protos-go/peer"
+	"github.com/hyperledger/fabric/gossip/common"
 	"github.com/hyperledger/fabric/internal/pkg/comm"
 	"google.golang.org/grpc"
 )
@@ -23,13 +24,16 @@ type endorser struct {
 }
 
 type orderer struct {
-	client ab.AtomicBroadcastClient
+	client          ab.AtomicBroadcastClient
+	closeConnection func() error
 	*endpointConfig
 }
 
 type endpointConfig struct {
-	address string
-	mspid   string
+	pkiid        common.PKIidType
+	address      string
+	mspid        string
+	tlsRootCerts [][]byte
 }
 
 type (
@@ -47,7 +51,7 @@ type endpointFactory struct {
 	dialer          dialer
 }
 
-func (ef *endpointFactory) newEndorser(address, mspid string, tlsRootCerts [][]byte) (*endorser, error) {
+func (ef *endpointFactory) newEndorser(pkiid common.PKIidType, address, mspid string, tlsRootCerts [][]byte) (*endorser, error) {
 	conn, err := ef.newConnection(address, tlsRootCerts)
 	if err != nil {
 		return nil, err
@@ -58,7 +62,7 @@ func (ef *endpointFactory) newEndorser(address, mspid string, tlsRootCerts [][]b
 	}
 	return &endorser{
 		client:         connectEndorser(conn),
-		endpointConfig: &endpointConfig{address: address, mspid: mspid},
+		endpointConfig: &endpointConfig{pkiid: pkiid, address: address, mspid: mspid, tlsRootCerts: tlsRootCerts},
 	}, nil
 }
 
@@ -72,8 +76,9 @@ func (ef *endpointFactory) newOrderer(address, mspid string, tlsRootCerts [][]by
 		connectOrderer = ab.NewAtomicBroadcastClient
 	}
 	return &orderer{
-		client:         connectOrderer(conn),
-		endpointConfig: &endpointConfig{address: address, mspid: mspid},
+		client:          connectOrderer(conn),
+		closeConnection: conn.Close,
+		endpointConfig:  &endpointConfig{address: address, mspid: mspid, tlsRootCerts: tlsRootCerts},
 	}, nil
 }
 

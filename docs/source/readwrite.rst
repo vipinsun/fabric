@@ -117,7 +117,7 @@ shows the snapshot of the world state against which the transactions are
 simulated and the sequence of read and write activities performed by
 each of these transactions.
 
-::
+.. code-block:: none
 
     World state: (k1,1,v1), (k2,1,v2), (k3,1,v3), (k4,1,v4), (k5,1,v5)
     T1 -> Write(k1, v1'), Write(k2, v2')
@@ -143,7 +143,7 @@ T1,..,T5 (could be contained in a single block or different blocks)
 4. ``T4`` fails the validation because it reads a key, ``k2``, which was
    modified by a preceding transaction ``T1``
 
-5. ``T5`` passes validation because it reads a key, ``k5,`` which was
+5. ``T5`` passes validation because it reads a key, ``k5``, which was
    not modified by any of the preceding transactions
 
 **Note**: Transactions with multiple read-write sets are not yet supported.

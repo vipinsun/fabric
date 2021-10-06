@@ -16,9 +16,12 @@ import (
 
 	docker "github.com/fsouza/go-dockerclient"
 	"github.com/golang/protobuf/proto"
+	"github.com/hyperledger/fabric-protos-go/common"
 	"github.com/hyperledger/fabric-protos-go/gateway"
+	"github.com/hyperledger/fabric-protos-go/orderer"
 	"github.com/hyperledger/fabric-protos-go/peer"
 	"github.com/hyperledger/fabric/integration/nwo"
+	"github.com/hyperledger/fabric/protoutil"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 	"github.com/tedsuo/ifrit"
@@ -26,6 +29,47 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 )
+
+func NewProposedTransaction(signingIdentity *nwo.SigningIdentity, channelName, chaincodeName, transactionName string, transientData map[string][]byte, args ...[]byte) (*peer.SignedProposal, string) {
+	proposal, transactionID := newProposalProto(signingIdentity, channelName, chaincodeName, transactionName, transientData, args...)
+	signedProposal, err := protoutil.GetSignedProposal(proposal, signingIdentity)
+	Expect(err).NotTo(HaveOccurred())
+
+	return signedProposal, transactionID
+}
+
+func newProposalProto(signingIdentity *nwo.SigningIdentity, channelName, chaincodeName, transactionName string, transientData map[string][]byte, args ...[]byte) (*peer.Proposal, string) {
+	creator, err := signingIdentity.Serialize()
+	Expect(err).NotTo(HaveOccurred())
+
+	invocationSpec := &peer.ChaincodeInvocationSpec{
+		ChaincodeSpec: &peer.ChaincodeSpec{
+			Type:        peer.ChaincodeSpec_NODE,
+			ChaincodeId: &peer.ChaincodeID{Name: chaincodeName},
+			Input:       &peer.ChaincodeInput{Args: chaincodeArgs(transactionName, args...)},
+		},
+	}
+
+	result, transactionID, err := protoutil.CreateChaincodeProposalWithTransient(
+		common.HeaderType_ENDORSER_TRANSACTION,
+		channelName,
+		invocationSpec,
+		creator,
+		transientData,
+	)
+	Expect(err).NotTo(HaveOccurred())
+
+	return result, transactionID
+}
+
+func chaincodeArgs(transactionName string, args ...[]byte) [][]byte {
+	result := make([][]byte, len(args)+1)
+
+	result[0] = []byte(transactionName)
+	copy(result[1:], args)
+
+	return result
+}
 
 var _ = Describe("GatewayService", func() {
 	var (
@@ -50,8 +94,6 @@ var _ = Describe("GatewayService", func() {
 
 		config := nwo.BasicEtcdRaft()
 		network = nwo.New(config, testDir, client, StartPort(), components)
-
-		network.GatewayEnabled = true
 
 		network.GenerateConfigTree()
 		network.Bootstrap()
@@ -114,7 +156,7 @@ var _ = Describe("GatewayService", func() {
 	})
 
 	submitTransaction := func(transactionName string, args ...[]byte) (*peer.Response, string) {
-		proposedTransaction, transactionID := NewProposedTransaction(signingIdentity, "testchannel", "gatewaycc", transactionName, args...)
+		proposedTransaction, transactionID := NewProposedTransaction(signingIdentity, "testchannel", "gatewaycc", transactionName, nil, args...)
 
 		endorseRequest := &gateway.EndorseRequest{
 			TransactionId:       transactionID,
@@ -163,9 +205,41 @@ var _ = Describe("GatewayService", func() {
 		return gatewayClient.CommitStatus(ctx, signedStatusRequest)
 	}
 
+	chaincodeEvents := func(
+		ctx context.Context,
+		startPosition *orderer.SeekPosition,
+		identity func() ([]byte, error),
+		sign func(msg []byte) ([]byte, error),
+	) (gateway.Gateway_ChaincodeEventsClient, error) {
+		identityBytes, err := identity()
+		Expect(err).NotTo(HaveOccurred())
+
+		request := &gateway.ChaincodeEventsRequest{
+			ChannelId:   "testchannel",
+			ChaincodeId: "gatewaycc",
+			Identity:    identityBytes,
+		}
+		if startPosition != nil {
+			request.StartPosition = startPosition
+		}
+
+		requestBytes, err := proto.Marshal(request)
+		Expect(err).NotTo(HaveOccurred())
+
+		signature, err := sign(requestBytes)
+		Expect(err).NotTo(HaveOccurred())
+
+		signedRequest := &gateway.SignedChaincodeEventsRequest{
+			Request:   requestBytes,
+			Signature: signature,
+		}
+
+		return gatewayClient.ChaincodeEvents(ctx, signedRequest)
+	}
+
 	Describe("Evaluate", func() {
 		It("should respond with the expected result", func() {
-			proposedTransaction, transactionID := NewProposedTransaction(signingIdentity, "testchannel", "gatewaycc", "respond", []byte("200"), []byte("conga message"), []byte("conga payload"))
+			proposedTransaction, transactionID := NewProposedTransaction(signingIdentity, "testchannel", "gatewaycc", "respond", nil, []byte("200"), []byte("conga message"), []byte("conga payload"))
 
 			request := &gateway.EvaluateRequest{
 				TransactionId:       transactionID,
@@ -203,10 +277,10 @@ var _ = Describe("GatewayService", func() {
 	Describe("CommitStatus", func() {
 		It("should respond with status of submitted transaction", func() {
 			_, transactionID := submitTransaction("respond", []byte("200"), []byte("conga message"), []byte("conga payload"))
-			status, err := commitStatus(transactionID, signingIdentity.Serialize, signingIdentity.Sign)
+			statusResult, err := commitStatus(transactionID, signingIdentity.Serialize, signingIdentity.Sign)
 			Expect(err).NotTo(HaveOccurred())
 
-			Expect(status.Result).To(Equal(peer.TxValidationCode_VALID))
+			Expect(statusResult.Result).To(Equal(peer.TxValidationCode_VALID))
 		})
 
 		It("should respond with block number", func() {
@@ -246,30 +320,16 @@ var _ = Describe("GatewayService", func() {
 
 	Describe("ChaincodeEvents", func() {
 		It("should respond with emitted chaincode events", func() {
-			identityBytes, err := signingIdentity.Serialize()
-			Expect(err).NotTo(HaveOccurred())
-
-			request := &gateway.ChaincodeEventsRequest{
-				ChannelId:   "testchannel",
-				ChaincodeId: "gatewaycc",
-				Identity:    identityBytes,
-			}
-
-			requestBytes, err := proto.Marshal(request)
-			Expect(err).NotTo(HaveOccurred())
-
-			signature, err := signingIdentity.Sign(requestBytes)
-			Expect(err).NotTo(HaveOccurred())
-
-			signedRequest := &gateway.SignedChaincodeEventsRequest{
-				Request:   requestBytes,
-				Signature: signature,
-			}
-
 			eventCtx, cancel := context.WithTimeout(ctx, 30*time.Second)
 			defer cancel()
 
-			eventsClient, err := gatewayClient.ChaincodeEvents(eventCtx, signedRequest)
+			startPosition := &orderer.SeekPosition{
+				Type: &orderer.SeekPosition_NextCommit{
+					NextCommit: &orderer.SeekNextCommit{},
+				},
+			}
+
+			eventsClient, err := chaincodeEvents(eventCtx, startPosition, signingIdentity.Serialize, signingIdentity.Sign)
 			Expect(err).NotTo(HaveOccurred())
 
 			_, transactionID := submitTransaction("event", []byte("EVENT_NAME"), []byte("EVENT_PAYLOAD"))
@@ -285,6 +345,109 @@ var _ = Describe("GatewayService", func() {
 				Payload:     []byte("EVENT_PAYLOAD"),
 			}
 			Expect(proto.Equal(event.Events[0], expectedEvent)).To(BeTrue(), "Expected\n\t%#v\nto proto.Equal\n\t%#v", event.Events[0], expectedEvent)
+		})
+
+		It("should respond with replayed chaincode events", func() {
+			_, transactionID := submitTransaction("event", []byte("EVENT_NAME"), []byte("EVENT_PAYLOAD"))
+			statusResult, err := commitStatus(transactionID, signingIdentity.Serialize, signingIdentity.Sign)
+			Expect(err).NotTo(HaveOccurred())
+
+			eventCtx, cancel := context.WithTimeout(ctx, 30*time.Second)
+			defer cancel()
+
+			startPosition := &orderer.SeekPosition{
+				Type: &orderer.SeekPosition_Specified{
+					Specified: &orderer.SeekSpecified{
+						Number: statusResult.BlockNumber,
+					},
+				},
+			}
+
+			eventsClient, err := chaincodeEvents(eventCtx, startPosition, signingIdentity.Serialize, signingIdentity.Sign)
+			Expect(err).NotTo(HaveOccurred())
+
+			event, err := eventsClient.Recv()
+			Expect(err).NotTo(HaveOccurred())
+
+			Expect(event.BlockNumber).To(Equal(statusResult.BlockNumber), "block number")
+			Expect(event.Events).To(HaveLen(1), "number of events")
+			expectedEvent := &peer.ChaincodeEvent{
+				ChaincodeId: "gatewaycc",
+				TxId:        transactionID,
+				EventName:   "EVENT_NAME",
+				Payload:     []byte("EVENT_PAYLOAD"),
+			}
+			Expect(proto.Equal(event.Events[0], expectedEvent)).To(BeTrue(), "Expected\n\t%#v\nto proto.Equal\n\t%#v", event.Events[0], expectedEvent)
+		})
+
+		It("should default to next commit if start position not specified", func() {
+			eventCtx, cancel := context.WithTimeout(ctx, 30*time.Second)
+			defer cancel()
+
+			var startPosition *orderer.SeekPosition
+
+			eventsClient, err := chaincodeEvents(eventCtx, startPosition, signingIdentity.Serialize, signingIdentity.Sign)
+			Expect(err).NotTo(HaveOccurred())
+
+			_, transactionID := submitTransaction("event", []byte("EVENT_NAME"), []byte("EVENT_PAYLOAD"))
+
+			event, err := eventsClient.Recv()
+			Expect(err).NotTo(HaveOccurred())
+
+			Expect(event.Events).To(HaveLen(1), "number of events")
+			expectedEvent := &peer.ChaincodeEvent{
+				ChaincodeId: "gatewaycc",
+				TxId:        transactionID,
+				EventName:   "EVENT_NAME",
+				Payload:     []byte("EVENT_PAYLOAD"),
+			}
+			Expect(proto.Equal(event.Events[0], expectedEvent)).To(BeTrue(), "Expected\n\t%#v\nto proto.Equal\n\t%#v", event.Events[0], expectedEvent)
+		})
+
+		It("should fail on unauthorized identity", func() {
+			badIdentity := network.OrdererUserSigner(network.Orderer("orderer"), "Admin")
+
+			eventCtx, cancel := context.WithTimeout(ctx, 30*time.Second)
+			defer cancel()
+
+			startPosition := &orderer.SeekPosition{
+				Type: &orderer.SeekPosition_NextCommit{
+					NextCommit: &orderer.SeekNextCommit{},
+				},
+			}
+
+			eventsClient, err := chaincodeEvents(eventCtx, startPosition, badIdentity.Serialize, signingIdentity.Sign)
+			Expect(err).NotTo(HaveOccurred())
+
+			event, err := eventsClient.Recv()
+			Expect(err).To(HaveOccurred(), "expected error but got event: %v", event)
+
+			grpcErr, _ := status.FromError(err)
+			Expect(grpcErr.Code()).To(Equal(codes.PermissionDenied))
+		})
+
+		It("should fail on bad signature", func() {
+			badSign := func(digest []byte) ([]byte, error) {
+				return signingIdentity.Sign([]byte("WRONG"))
+			}
+
+			eventCtx, cancel := context.WithTimeout(ctx, 30*time.Second)
+			defer cancel()
+
+			startPosition := &orderer.SeekPosition{
+				Type: &orderer.SeekPosition_NextCommit{
+					NextCommit: &orderer.SeekNextCommit{},
+				},
+			}
+
+			eventsClient, err := chaincodeEvents(eventCtx, startPosition, signingIdentity.Serialize, badSign)
+			Expect(err).NotTo(HaveOccurred())
+
+			event, err := eventsClient.Recv()
+			Expect(err).To(HaveOccurred(), "expected error but got event: %v", event)
+
+			grpcErr, _ := status.FromError(err)
+			Expect(grpcErr.Code()).To(Equal(codes.PermissionDenied))
 		})
 	})
 })

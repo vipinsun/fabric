@@ -15,6 +15,8 @@ github.com/hyperledger/fabric-chaincode-go v0.0.0-20190823162523-04390e015b85/go
 github.com/hyperledger/fabric-protos-go v0.0.0-20190821214336-621b908d5022/go.mod h1:xVYTjK4DtZRBxZ2D9aE4y6AbLaPwue2o/criQyQbVD0=
 github.com/hyperledger/fabric-protos-go v0.0.0-20190823190507-26c33c998676 h1:35/AU/6kOZgrblvSjglQ6yoz3opCKTpfoMjQygtCD/U=
 github.com/hyperledger/fabric-protos-go v0.0.0-20190823190507-26c33c998676/go.mod h1:xVYTjK4DtZRBxZ2D9aE4y6AbLaPwue2o/criQyQbVD0=
+github.com/hyperledger/fabric-protos-go v0.0.0-20220827195505-ce4c067a561d h1:Dk7Z9MjzZmz+pkpC7KbH6c3A9PEN9youAIjlMJw58ro=
+github.com/hyperledger/fabric-protos-go v0.0.0-20220827195505-ce4c067a561d/go.mod h1:xVYTjK4DtZRBxZ2D9aE4y6AbLaPwue2o/criQyQbVD0=
 github.com/kisielk/errcheck v1.1.0/go.mod h1:EZBBE59ingxPouuu3KfxchcWSUPOHkagtvWXihfKN4Q=
 github.com/kisielk/gotool v1.0.0/go.mod h1:XhKaO+MFFWcvkIS/tQcRk01m1F5IRFswLeQ+oQHNcck=
 github.com/kr/pretty v0.1.0/go.mod h1:dAy3ld7l9f0ibDNOQOHHMYYIIbhfbHSm3C4ZsoJORNo=

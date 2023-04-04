@@ -400,7 +400,7 @@ github.com/syndtr/goleveldb/leveldb/opt
 github.com/syndtr/goleveldb/leveldb/storage
 github.com/syndtr/goleveldb/leveldb/table
 github.com/syndtr/goleveldb/leveldb/util
-# github.com/tedsuo/ifrit v0.0.0-20180802180643-bea94bb476cc
+# github.com/tedsuo/ifrit v0.0.0-20220120221754-dd274de71113
 ## explicit
 github.com/tedsuo/ifrit
 github.com/tedsuo/ifrit/ginkgomon

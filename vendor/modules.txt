@@ -91,8 +91,7 @@ github.com/containerd/continuity/sysx
 # github.com/coreos/go-systemd v0.0.0-20190620071333-e64a0ec8b42a
 ## explicit
 github.com/coreos/go-systemd/journal
-# github.com/coreos/pkg v0.0.0-20180108230652-97fdf19511ea
-## explicit
+# github.com/coreos/pkg v0.0.0-20180928190104-399ea9e2e55f
 github.com/coreos/pkg/capnslog
 # github.com/davecgh/go-spew v1.1.1
 ## explicit
@@ -363,7 +362,7 @@ github.com/spf13/afero/mem
 # github.com/spf13/cast v1.3.1
 ## explicit
 github.com/spf13/cast
-# github.com/spf13/cobra v0.0.3
+# github.com/spf13/cobra v0.0.7
 ## explicit
 github.com/spf13/cobra
 # github.com/spf13/jwalterweatherman v1.1.0
@@ -372,7 +371,7 @@ github.com/spf13/jwalterweatherman
 # github.com/spf13/pflag v1.0.5
 ## explicit
 github.com/spf13/pflag
-# github.com/spf13/viper v1.1.1
+# github.com/spf13/viper v1.4.0
 ## explicit
 github.com/spf13/viper
 # github.com/stretchr/objx v0.3.0

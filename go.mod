@@ -53,7 +53,7 @@ require (
 	github.com/stretchr/objx v0.3.0 // indirect
 	github.com/stretchr/testify v1.7.1-0.20210116013205-6990a05d54c2 // includes ErrorContains
 	github.com/sykesm/zap-logfmt v0.0.2
-	github.com/syndtr/goleveldb v1.0.1-0.20210305035536-64b5b1c73954
+	github.com/syndtr/goleveldb 126854af5e6d
 	github.com/tedsuo/ifrit v0.0.0-20180802180643-bea94bb476cc
 	github.com/willf/bitset v1.1.10
 	go.etcd.io/etcd v0.5.0-alpha.5.0.20181228115726-23731bf9ba55

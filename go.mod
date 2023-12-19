@@ -59,8 +59,8 @@ require (
 	go.etcd.io/etcd v0.5.0-alpha.5.0.20181228115726-23731bf9ba55
 	go.uber.org/multierr v1.6.0 // indirect
 	go.uber.org/zap v1.16.0
-	golang.org/x/crypto v0.0.0-20210322153248-0c34fe9e7dc2
-	golang.org/x/tools v0.0.0-20200131233409-575de47986ce
+	golang.org/x/crypto v0.17.0
+	golang.org/x/tools v0.6.0
 	google.golang.org/grpc v1.31.0
 	gopkg.in/alecthomas/kingpin.v2 v2.2.6
 	gopkg.in/cheggaaa/pb.v1 v1.0.28
